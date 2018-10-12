@@ -9,59 +9,7 @@ class PianoKeyboard extends HTMLElement {
         // set up shadow root right away so we can add midi port selector
         console.log("beginning of constructor function");
 
-        var _endNoteName = "A0";
-        var _startNoteName = "G#0";
-        var _octaves;
-        var _selectedMidiOut;
-        var midiAccess;
-        var number = 3.14;
-        this.selectedOutputPort = null;
-        this.initMidi = function(options) {
-            console.log("in initMidi()");
-            return navigator.requestMIDIAccess(options);
-        };
-        this.listMidiOutputsAndWaitForSelection = function() { // set up a list of possible outputs, tell user to select one
-            
 
-            //add selector for midi output port
-            // to tell how many entries there are:
-            var outputs = this.midiAccessObject.outputs;
-            var portSelectorElement = document.createElement("select");
-            portSelectorElement.id = "outputportselector";
-            shadowRoot.appendChild(portSelectorElement);
-            var blankOption = document.createElement("option");
-            blankOption.text = output.name;
-            blankOption.setAttribute("value", output.id);
-            shadowRoot.getElementById("outputportselector").appendChild(blankOption);
-            for (let output of outputs.values()) {
-                var opt = document.createElement("option");
-                opt.text = output.name;
-                opt.setAttribute("value", output.id);
-                shadowRoot.getElementById("outputportselector").appendChild(opt);
-            }
-            console.log("in dealWithMIDIOutputs()");
-            portSelectorElement.addEventListener('change', function (event) {
-                resolve(event.target.value);
-            });
-        };
-        this.openOutputPort = function(portId) {
-
-            midiAccessObject.outputs.get(portId).open();
-            return this.midiAccessObject.outputs.get(portId).open();
-        };
-        this.assignOutputPort = function(midiPortPromise){
-            selectedOutputPort = midiPortPromise.value;
-        };
-        this.outputNote = function(midiNoteNumber) {
-            var noteOnMessage = [0x90, midiNoteNumber, 0x7f];
-            var noteOffMessage = [0x80, midiNoteNumber, 0x00];
-            this.selectedOutputPort.send(noteOnMessage);
-            this.selectedOutputPort.send(noteOffMessage, window.performance.now() + 100); // 1/10 second later turn off the note
-        };
-
-        this.midiAccessObject = this.initMidi({"sysex": false, "software": false}).value;
-        let midiOutputSelectedPromise = this.listMidiOutputsAndWaitForSelection();
-        this.selecteOutputPort = midiOutputSelectedPromise.then(openOutputPort).value;
 
 
         //        .then(this.dealWithMidiOutputs).then(this.openOutputPort).then();
@@ -70,31 +18,7 @@ class PianoKeyboard extends HTMLElement {
     }
     connectedCallback() {
 
-        function listInputsAndOutputs(midiAccess) {
-            for (var entry of midiAccess.inputs) {
-                var input = entry[1];
-                console.log("Input port [type:'" + input.type + "'] id:'" + input.id +
-                    "' manufacturer:'" + input.manufacturer + "' name:'" + input.name +
-                    "' version:'" + input.version + "'");
-            }
-
-            for (var entry of midiAccess.outputs) {
-                var output = entry[1];
-                console.log("Output port [type:'" + output.type + "'] id:'" + output.id +
-                    "' manufacturer:'" + output.manufacturer + "' name:'" + output.name +
-                    "' version:'" + output.version + "'");
-            }
-        }
-
-
-
-
-
-
-
         console.log("calling midi init");
-
-
 
         this.startNote = this.getAttribute("startNote");
         this.endNote = this.getAttribute("endNote");
@@ -121,13 +45,16 @@ class PianoKeyboard extends HTMLElement {
             }
         };
 
+        /* in the provided SVG example:
+        individual white key width is 161/8 = 20.125 (eight keys per octave at 161 width per octave)
+        white key w/h ratio is 20.125/120  */
+
         var xKeyStartPos = 0;
         var xIncToDrawKey = 0;
-        var drawWidth = 161; // from the sample piano svg I used
-        var wkWidth = drawWidth / numWhiteKeyWidths;
+        var wkWidth = 1; 
         var bkWidth = (7 / 12) * wkWidth;
-        var wkHeight = 1;
-        var bkHeight = 2 / 3;
+        var wkHeight = 120/20.125;
+        var bkHeight = (2 / 3)*wkHeight;
         console.log("white key width" + wkWidth);
 
         let xIncThisNote = function (positionInScale) {
@@ -167,15 +94,13 @@ class PianoKeyboard extends HTMLElement {
         //var startSelection = document.getElementById("startNoteSelection");
         //var endSelection = document.getElementById("endNoteSelection");
 
-        /* Create the SVG. Note that we need createElementNS, not createElement */
-        var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 161 120");
-        svg.setAttribute("stroke-width", "0.25%");
+
 
         // create note drawing using range
         var drawIndex;
         var stopIndex = this.noteList.indexOf(this.endNote);
         let blackKeys = [];
+        let whiteKeys = [];
         console.log(this.noteList);
         console.log("start note attribute:");
         console.log(this.startNote);
@@ -192,40 +117,45 @@ class PianoKeyboard extends HTMLElement {
             console.log("x draw start position for this note:");
             console.log(xDrawPos);
             let newKey = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            var midiNote = drawIndex + 21;
-            newKey.onclick = this.outputNote(this.selectedMidiOut, midiNote);
+
             if (this.isNoteBW(this.noteIndexToScalePosition(drawIndex)) == "W") {
                 setAttributes(newKey, {
                     "style": "fill:white;stroke:black",
                     "x": xDrawPos,
                     "y": 0,
                     "width": wkWidth,
-                    "height": (wkHeight * 100).toString() + "%"
+                    "height": wkHeight
                 });
-                svg.appendChild(newKey); // add white keys right away sothey're on the bottom
+                whiteKeys.push(newKey.cloneNode());
+                // svg.appendChild(newKey); // add white keys right away sothey're on the bottom
             } else {
                 setAttributes(newKey, {
                     "style": "fill:black;stroke:black",
                     "x": xDrawPos,
                     "y": 0,
                     "width": bkWidth,
-                    "height": (bkHeight * 100).toString() + "%"
+                    "height": bkHeight
                 });
                 blackKeys.push(newKey.cloneNode()); // add the black note to the array of black note nodes to apply later
             }
         }
+        let viewboxWidth = wkWidth*numWhiteKeyWidths;
+        /* Create the SVG. Note that we need createElementNS, not createElement */
+        var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 " + viewboxWidth + " " + wkHeight);
+        svg.setAttribute("stroke-width", "0.25%");
+        whiteKeys.forEach(function (whiteNote){ // white keys first so that black gets draw on top
+            svg.appendChild(whiteNote);
+        });
         blackKeys.forEach(function (blackNote) {
             svg.appendChild(blackNote);
         });
 
-
-
-
-        shadowRoot.appendChild(svg);
+        this.shadowRoot.appendChild(svg);
 
         var style = document.createElement("style");
         style.innerHTML = ":host {display: block; position: relative; contain: content;}";
-        shadowRoot.appendChild(style);
+        this.shadowRoot.appendChild(style);
 
         console.log("end of connectedCallback function");
     }
@@ -239,9 +169,7 @@ class PianoKeyboard extends HTMLElement {
             return "B";
         }
     }
-    noteIndexToMidiNum(noteIdx) {
-        return noteIdx + 21;
-    }
+
 
     /* class properties */
     get noteList() { // array of note values.  scale numbering based on minor scale because life sucks
@@ -279,12 +207,6 @@ class PianoKeyboard extends HTMLElement {
     set octaves(newValue) {
         // later add processing to adjust existing svg & midi stuff
         this.setAttribute('octaves', newValue);
-    }
-    get selectedMidiOut() {
-        return this._selectedMidiOut;
-    }
-    set selectedMidiOut(midiPort) {
-        this._selectedMidiOut = midiPort;
     }
 }
 
