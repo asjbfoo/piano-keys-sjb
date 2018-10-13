@@ -4,70 +4,34 @@ class PianoKeyboard extends HTMLElement {
         var shadowRoot = this.attachShadow({
             mode: 'open'
         });
+
+        /* in the provided SVG example:
+        individual white key width is 161/8 = 20.125 (eight keys per octave at 161 width per octave)
+        white key w/h ratio is 20.125/120  */
+        this.wkWidth = 1;  // width of the white key is the "base unit" for drawing everything else
+        this.bkWidth = (7 / 12) * this.wkWidth;
+        this.wkHeight = 120/20.125;
+        this.bkHeight = (2 / 3)*this.wkHeight;
+
         /* Not much to see here since per custom element spec you can't access dom attributes in the constructor.
         Since everything starts with the selected notes (in attributes), all the processing is done in connectedCallback()    */
 
     }
     connectedCallback() {
+        // get initial drawing parameters
         this.startNote = this.getAttribute("startNote");
         this.endNote = this.getAttribute("endNote");
 
-        var numOctaves = (this.noteList.indexOf(this.endNote) - this.noteList.indexOf(this.startNote) + 2) / 12; // plus twothere as a quick & dirty way to account for last key going over the edge of the viewbox. accounts for up to two black key widths
+        this.drawKeyboard();
 
-        var numWhiteKeyWidths = 0; // determine the number of white key widths to account for in scaling
-        for (let i = this.noteList.indexOf(this.startNote); i <= this.noteList.indexOf(this.endNote); i++) {
-            if (this.isNoteBW(this.noteIndexToScalePosition(i)) === "W") {
-                numWhiteKeyWidths++;
-            }
-        }
-        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.startNote))) === "B") {
-            numWhiteKeyWidths++; // if the first note selected is black, add one to account for the blank space that will be to the left
-        }
-        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.endNote))) === "B") {
-            numWhiteKeyWidths++; // if the last note selected....
-        }
-
+        var style = document.createElement("style");
+        style.innerHTML = ":host {display: block; position: relative; contain: content;}";
+        this.shadowRoot.appendChild(style);
+    }
+    drawKeyboard(){
         let setAttributes = function (el, attrs) {
             for (var key in attrs) {
                 el.setAttribute(key, attrs[key]);
-            }
-        };
-
-        /* in the provided SVG example:
-        individual white key width is 161/8 = 20.125 (eight keys per octave at 161 width per octave)
-        white key w/h ratio is 20.125/120  */
-
-        var wkWidth = 1; 
-        var bkWidth = (7 / 12) * wkWidth;
-        var wkHeight = 120/20.125;
-        var bkHeight = (2 / 3)*wkHeight;
-
-        let xIncThisNote = function (positionInScale) {
-            switch (positionInScale) {
-                case 4: // with no accidental, next key is one white keuy width from the last
-                    return wkWidth;
-                case 9:
-                    return wkWidth;
-                case 1: // A
-                    return 0.5 * bkWidth;
-                case 2: // A#
-                    return wkWidth - (0.25 * bkWidth);
-                case 3: // B
-                    return (0.25 * bkWidth);
-                case 5: // C#
-                    return (wkWidth) - ((2 / 3) * bkWidth);
-                case 6:
-                    return (2 / 3) * bkWidth;
-                case 7:
-                    return (wkWidth) - ((1 / 3) * bkWidth);
-                case 8:
-                    return (1 / 3) * bkWidth;
-                case 10:
-                    return (wkWidth) - (0.75 * bkWidth);
-                case 11:
-                    return 0.75 * bkWidth;
-                case 12:
-                    return (wkWidth) - (0.5 * bkWidth);
             }
         };
 
@@ -81,7 +45,7 @@ class PianoKeyboard extends HTMLElement {
         for (let drawIndex = this.noteList.indexOf(this.startNote); drawIndex <= stopIndex; drawIndex++) {
 
             if (drawIndex > this.noteList.indexOf(this.startNote) || this.isNoteBW(this.noteIndexToScalePosition(this.startNote)) === "B") {
-                xDrawPos += xIncThisNote(this.noteIndexToScalePosition(drawIndex));
+                xDrawPos += this.xIncThisNote(this.noteIndexToScalePosition(drawIndex));
             }
 
             let newKey = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -91,8 +55,8 @@ class PianoKeyboard extends HTMLElement {
                     "style": "fill:white;stroke:black",
                     "x": xDrawPos,
                     "y": 0,
-                    "width": wkWidth,
-                    "height": wkHeight
+                    "width": this.wkWidth,
+                    "height": this.wkHeight
                 });
                 whiteKeys.push(newKey.cloneNode());
             } else {
@@ -100,17 +64,17 @@ class PianoKeyboard extends HTMLElement {
                     "style": "fill:black;stroke:black",
                     "x": xDrawPos,
                     "y": 0,
-                    "width": bkWidth,
-                    "height": bkHeight
+                    "width": this.bkWidth,
+                    "height": this.bkHeight
                 });
                 blackKeys.push(newKey.cloneNode()); // add the black note to the array of black note nodes to apply later
             }
         }
 
-        let viewboxWidth = wkWidth*numWhiteKeyWidths;
+        let viewboxWidth = this.wkWidth*this.numWhiteKeyWidths;
         /* Create the SVG. Note that we need createElementNS, not createElement */
         var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 " + viewboxWidth + " " + wkHeight);
+        svg.setAttribute("viewBox", "0 0 " + viewboxWidth + " " + this.wkHeight);
         svg.setAttribute("stroke-width", "0.25%");
         whiteKeys.forEach(function (whiteNote){ // white keys first so that black gets draw on top
             svg.appendChild(whiteNote);
@@ -120,10 +84,34 @@ class PianoKeyboard extends HTMLElement {
         });
 
         this.shadowRoot.appendChild(svg);
-
-        var style = document.createElement("style");
-        style.innerHTML = ":host {display: block; position: relative; contain: content;}";
-        this.shadowRoot.appendChild(style);
+    }
+    xIncThisNote(positionInScale) { // returns the width increment needed to correctly position the current note in the scale
+        switch (positionInScale) {
+            case 4: // with no accidental, next key is one white keuy width from the last
+                return this.wkWidth;
+            case 9:
+                return this.wkWidth;
+            case 1: // A
+                return 0.5 * this.bkWidth;
+            case 2: // A#
+                return this.wkWidth - (0.25 * this.bkWidth);
+            case 3: // B
+                return (0.25 * this.bkWidth);
+            case 5: // C#
+                return (this.wkWidth) - ((2 / 3) * this.bkWidth);
+            case 6:
+                return (2 / 3) * this.bkWidth;
+            case 7:
+                return (this.wkWidth) - ((1 / 3) * this.bkWidth);
+            case 8:
+                return (1 / 3) * this.bkWidth;
+            case 10:
+                return (this.wkWidth) - (0.75 * this.bkWidth);
+            case 11:
+                return 0.75 * this.bkWidth;
+            case 12:
+                return (this.wkWidth) - (0.5 * this.bkWidth);
+        }
     }
 
     noteIndexToScalePosition(noteNumber) { // returns the position in the scale given a particular note array index
@@ -165,6 +153,23 @@ class PianoKeyboard extends HTMLElement {
     set endNote(noteToSet) {
         this.setAttribute("endNote", noteToSet);
         this._endNoteName = noteToSet;
+    }
+    get numWhiteKeyWidths(){
+        let numKeys = 0;
+
+        for (let i = this.noteList.indexOf(this.startNote); i <= this.noteList.indexOf(this.endNote); i++) {
+            if (this.isNoteBW(this.noteIndexToScalePosition(i)) === "W") {
+                numKeys++;
+            }
+        }
+        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.startNote))) === "B") {
+            numKeys++; // if the first note selected is black, add one to account for the blank space that will be to the left
+        }
+        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.endNote))) === "B") {
+            numKeys++; // if the last note selected....
+        }
+
+        return numKeys;
     }
     get octaves() {
         return this.getAttribute('octaves');
