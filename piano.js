@@ -1,16 +1,16 @@
 class PianoKeyboard extends HTMLElement {
+    static get observedAttributes() {
+        return ['startNote', 'endNote', 'highlightNotes'];
+    }
     constructor() {
         super();
         var shadowRoot = this.attachShadow({
             mode: 'open'
         });
 
-        /* in the provided SVG example:
-        individual white key width is 161/8 = 20.125 (eight keys per octave at 161 width per octave)
-        white key w/h ratio is 20.125/120  */
         this.wkWidth = 1;  // width of the white key is the "base unit" for drawing everything else
         this.bkWidth = (7 / 12) * this.wkWidth;
-        this.wkHeight = 120/20.125;
+        this.wkHeight = 6;
         this.bkHeight = (2 / 3)*this.wkHeight;
 
         /* Not much to see here since per custom element spec you can't access dom attributes in the constructor.
@@ -21,7 +21,11 @@ class PianoKeyboard extends HTMLElement {
         // get initial drawing parameters
         this.startNote = this.getAttribute("startNote");
         this.endNote = this.getAttribute("endNote");
-
+        if(this.getAttribute("highlightedNotes")){
+            this.highlightedNoteIndices = this.getAttribute("highlightedNotes").split(",").map(x => this.noteList.indexOf(x));
+        }
+        //this.highlightedNoteIndices = this.highlightedNoteNames.map(x => this.noteList.indexOf(x));
+        console.log("highlighted notes:", this.highlightedNoteIndices);
         this.drawKeyboard();
 
         var style = document.createElement("style");
@@ -58,6 +62,9 @@ class PianoKeyboard extends HTMLElement {
                     "width": this.wkWidth,
                     "height": this.wkHeight
                 });
+                if(this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex)>=0){
+                    setAttributes(newKey,{"style": "fill:red;stroke:black"});
+                }
                 whiteKeys.push(newKey.cloneNode());
             } else {
                 setAttributes(newKey, {
@@ -67,9 +74,13 @@ class PianoKeyboard extends HTMLElement {
                     "width": this.bkWidth,
                     "height": this.bkHeight
                 });
+                if(this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex)>=0){
+                    setAttributes(newKey,{"style": "fill:red;stroke:black"});
+                }
                 blackKeys.push(newKey.cloneNode()); // add the black note to the array of black note nodes to apply later
             }
         }
+
 
         let viewboxWidth = this.wkWidth*this.numWhiteKeyWidths;
         /* Create the SVG. Note that we need createElementNS, not createElement */
@@ -88,7 +99,6 @@ class PianoKeyboard extends HTMLElement {
     xIncThisNote(positionInScale) { // returns the width increment needed to correctly position the current note in the scale
         switch (positionInScale) {
             case 4: // with no accidental, next key is one white keuy width from the last
-                return this.wkWidth;
             case 9:
                 return this.wkWidth;
             case 1: // A
