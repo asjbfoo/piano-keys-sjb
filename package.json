@@ -1,5 +1,5 @@
 {
-  "name": "sjb-piano-keyboard",
+  "name": "piano-keys-sjb",
   "version": "1.0.0",
   "description": "svg piano keyboard webcomponent",
   "main": "piano.js",
@@ -8,15 +8,22 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/asjbfoo/sjb-piano-keyboard.git"
+    "url": "git+https://github.com/asjbfoo/piano-keys-sjb.git"
   },
   "author": "Samuel Bridgeland",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/asjbfoo/sjb-piano-keyboard/issues"
+    "url": "https://github.com/asjbfoo/piano-keys-sjb/issues"
   },
-  "homepage": "https://github.com/asjbfoo/sjb-piano-keyboard#readme",
+  "homepage": "https://github.com/asjbfoo/piano-keys-sjb#readme",
   "dependencies": {
     "@webcomponents/webcomponentsjs": "^2.1.3"
-  }
+  },
+  "devDependencies": {},
+  "keywords": [
+    "svg",
+    "javascript",
+    "component",
+    "piano"
+  ]
 }
