@@ -8,23 +8,26 @@ class PianoKeyboard extends HTMLElement {
             mode: 'open'
         });
 
-        this.wkWidth = 1;  // width of the white key is the "base unit" for drawing everything else
+        this.wkWidth = 1; // width of the white key is the "base unit" for drawing everything else
         this.bkWidth = (7 / 12) * this.wkWidth;
         this.wkHeight = 6;
-        this.bkHeight = (2 / 3)*this.wkHeight;
-
+        this.bkHeight = (2 / 3) * this.wkHeight;
         /* Not much to see here since per custom element spec you can't access dom attributes in the constructor.
         Since everything starts with the selected notes (in attributes), all the processing is done in connectedCallback()    */
 
     }
     connectedCallback() {
+        if (navigator.requestMIDIAccess) {
+            //console.log(navigator.requestMIDIAccess());
+            navigator.requestMIDIAccess().then(this.onMIDIInit.bind(this), this.onMIDIReject.bind(this)); // use arrow functions because https://stackoverflow.com/questions/34930771/why-is-this-undefined-inside-class-method-when-using-promises/34930859
+        } else
+            alert("No MIDI support present in your browser.  You're gonna have a bad time.");
         // get initial drawing parameters
         this.startNote = this.getAttribute("startNote");
         this.endNote = this.getAttribute("endNote");
-        if(this.getAttribute("highlightedNotes")){
+        if (this.getAttribute("highlightedNotes")) {
             this.highlightedNoteIndices = this.getAttribute("highlightedNotes").split(",").map(x => this.noteList.indexOf(x));
         }
-        //this.highlightedNoteIndices = this.highlightedNoteNames.map(x => this.noteList.indexOf(x));
         console.log("highlighted notes:", this.highlightedNoteIndices);
         this.drawKeyboard();
 
@@ -32,7 +35,35 @@ class PianoKeyboard extends HTMLElement {
         style.innerHTML = ":host {display: block; position: relative; contain: content;}";
         this.shadowRoot.appendChild(style);
     }
-    drawKeyboard(){
+    onMIDIInit(midi) {
+        this.midiAccess = midi;
+
+        var haveAtLeastOneDevice = false;
+        this.outputs = this.midiAccess.outputs.values();
+        for (var output = this.outputs.next(); output && !output.done; output = this.outputs.next()) {
+            //output.value.onmidimessage = MIDIMessageEventHandler;
+            haveAtLeastOneDevice = true;
+        }
+        if (!haveAtLeastOneDevice)
+            alert("No MIDI output devices present.  We can still show notes, but nothing will be sent");
+        else // for now, while building midi support, just select the first output
+            this.selectedMidiOutputPortId = this.midiAccess.outputs.values().next().value.id;
+    }
+
+    onMIDIReject(err) {
+        alert("The MIDI system failed to start.  You're gonna have a bad time.");
+    }
+    sendMidiNote(midiAccess, portID, noteNum) {
+        var noteOnMessage = [0x90, noteNum, 0x7f]; // note on, middle C, full velocity
+        var output = midiAccess.outputs.get(portID);
+        output.send(noteOnMessage); //omitting the timestamp means send immediately.
+        output.send([0x80, noteNum, 0x40], window.performance.now() + 1000.0); // Inlined array creation- note off, middle C,
+        // release velocity = 64, timestamp = now + 1000ms.
+    }
+
+
+
+    drawKeyboard() {
         let setAttributes = function (el, attrs) {
             for (var key in attrs) {
                 el.setAttribute(key, attrs[key]);
@@ -45,56 +76,66 @@ class PianoKeyboard extends HTMLElement {
         var stopIndex = this.noteList.indexOf(this.endNote);
         let blackKeys = [];
         let whiteKeys = [];
-
         for (let drawIndex = this.noteList.indexOf(this.startNote); drawIndex <= stopIndex; drawIndex++) {
 
-            if (drawIndex > this.noteList.indexOf(this.startNote) || this.isNoteBW(this.noteIndexToScalePosition(this.startNote)) === "B") {
+            if (drawIndex > this.noteList.indexOf(this.startNote)) {
                 xDrawPos += this.xIncThisNote(this.noteIndexToScalePosition(drawIndex));
             }
 
             let newKey = document.createElementNS("http://www.w3.org/2000/svg", "rect");
 
+            setAttributes(newKey, {
+                "x": xDrawPos,
+                "y": 0,
+            });
+            if (this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex) >= 0) {
+                setAttributes(newKey, {
+                    "highlighted": "true",
+                    "style": "fill:red;stroke:black"
+                });
+            }
+            let copiedKey = newKey.cloneNode(true);
+            copiedKey.addEventListener("click", function () {
+                var thisNote = this.noteIndexToMidiNote(drawIndex);
+                this.sendMidiNote(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
+            }.bind(this));
             if (this.isNoteBW(this.noteIndexToScalePosition(drawIndex)) == "W") {
-                setAttributes(newKey, {
-                    "style": "fill:white;stroke:black",
-                    "x": xDrawPos,
-                    "y": 0,
-                    "width": this.wkWidth,
-                    "height": this.wkHeight
-                });
-                if(this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex)>=0){
-                    setAttributes(newKey,{"style": "fill:red;stroke:black"});
-                }
-                whiteKeys.push(newKey.cloneNode());
+                whiteKeys.push(copiedKey);
             } else {
-                setAttributes(newKey, {
-                    "style": "fill:black;stroke:black",
-                    "x": xDrawPos,
-                    "y": 0,
-                    "width": this.bkWidth,
-                    "height": this.bkHeight
-                });
-                if(this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex)>=0){
-                    setAttributes(newKey,{"style": "fill:red;stroke:black"});
-                }
-                blackKeys.push(newKey.cloneNode()); // add the black note to the array of black note nodes to apply later
+                blackKeys.push(copiedKey);
             }
         }
 
 
-        let viewboxWidth = this.wkWidth*this.numWhiteKeyWidths;
+        let viewboxWidth = this.wkWidth * this.numWhiteKeyWidths;
         /* Create the SVG. Note that we need createElementNS, not createElement */
         var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         svg.setAttribute("viewBox", "0 0 " + viewboxWidth + " " + this.wkHeight);
         svg.setAttribute("stroke-width", "0.25%");
-        whiteKeys.forEach(function (whiteNote){ // white keys first so that black gets draw on top
+
+        whiteKeys.forEach(function (whiteNote) { // white keys first so that black gets draw on top
+            if (whiteNote.getAttribute("highlighted") !== "true")
+                whiteNote.setAttribute("style", "fill:white;stroke:black");
+            setAttributes(whiteNote, {
+                "width": this.wkWidth,
+                "height": this.wkHeight
+            });
             svg.appendChild(whiteNote);
-        });
+        }.bind(this));
         blackKeys.forEach(function (blackNote) {
+            if (blackNote.getAttribute("highlighted") !== "true")
+                blackNote.setAttribute("style", "fill:black;stroke:black");
+            setAttributes(blackNote, {
+                "width": this.bkWidth,
+                "height": this.bkHeight
+            });
             svg.appendChild(blackNote);
-        });
+        }.bind(this));
 
         this.shadowRoot.appendChild(svg);
+    }
+    noteIndexToMidiNote(index) {
+        return index + 21; // A0 is midi #21 from http://www.inspiredacoustics.com/en/MIDI_note_numbers_and_center_frequencies
     }
     xIncThisNote(positionInScale) { // returns the width increment needed to correctly position the current note in the scale
         switch (positionInScale) {
@@ -164,7 +205,7 @@ class PianoKeyboard extends HTMLElement {
         this.setAttribute("endNote", noteToSet);
         this._endNoteName = noteToSet;
     }
-    get numWhiteKeyWidths(){
+    get numWhiteKeyWidths() {
         let numKeys = 0;
 
         for (let i = this.noteList.indexOf(this.startNote); i <= this.noteList.indexOf(this.endNote); i++) {
@@ -190,4 +231,4 @@ class PianoKeyboard extends HTMLElement {
     }
 }
 
-customElements.define('sjb-piano-keyboard', PianoKeyboard);
+customElements.define('piano-keys-sjb', PianoKeyboard);
