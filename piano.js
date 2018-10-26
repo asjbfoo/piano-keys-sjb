@@ -15,6 +15,8 @@ class PianoKeyboard extends HTMLElement {
         /* Not much to see here since per custom element spec you can't access dom attributes in the constructor.
         Since everything starts with the selected notes (in attributes), all the processing is done in connectedCallback()    */
 
+        this.activatedNotes = new Map();
+
     }
     connectedCallback() {
         if (navigator.requestMIDIAccess) {
@@ -60,10 +62,24 @@ class PianoKeyboard extends HTMLElement {
         output.send([0x80, noteNum, 0x40], window.performance.now() + 1000.0); // Inlined array creation- note off, middle C,
         // release velocity = 64, timestamp = now + 1000ms.
     }
+    sendMidiNoteOn(midiAccess, portID, noteNum){
+        var noteOnMessage = [0x90, noteNum, 0x7f]; // note on, middle C, full velocity
+        var output = midiAccess.outputs.get(portID);
+        output.send(noteOnMessage); //omitting the timestamp means send immediately.
+    }
+    sendMidiNoteOff(midiAccess, portID, noteNum){
+        var noteOffMessage = [0x80, noteNum, 0x7f]; // note off, middle C, full velocity
+        var output = midiAccess.outputs.get(portID);
+        output.send(noteOffMessage); //omitting the timestamp means send immediately.
+    }
 
 
 
     drawKeyboard() {
+        function playedNote(noteName, velocity){ // represents a note being played
+            this.note = noteName;
+            this.vel = velocity;
+        }
         let setAttributes = function (el, attrs) {
             for (var key in attrs) {
                 el.setAttribute(key, attrs[key]);
@@ -95,9 +111,34 @@ class PianoKeyboard extends HTMLElement {
                 });
             }
             let copiedKey = newKey.cloneNode(true);
-            copiedKey.addEventListener("click", function () {
-                var thisNote = this.noteIndexToMidiNote(drawIndex);
+            var thisNote = this.noteIndexToMidiNote(drawIndex);
+            
+            /*copiedKey.addEventListener("click", function () {
                 this.sendMidiNote(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
+            }.bind(this));*/
+            copiedKey.addEventListener("mousedown", function(){
+                if(!this.activatedNotes.has(this.noteList[drawIndex])){
+                    this.activatedNotes.set(this.noteList[drawIndex], new playedNote(this.noteList[drawIndex], 128));
+                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                }
+            }.bind(this));
+            copiedKey.addEventListener("mouseover", function(evt){
+                if(!this.activatedNotes.has(this.noteList[drawIndex]) && evt.buttons===1){
+                    this.activatedNotes.set(this.noteList[drawIndex], new playedNote(this.noteList[drawIndex], 128));
+                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                }
+            }.bind(this));
+            copiedKey.addEventListener("mouseout", function(){
+                if(this.activatedNotes.has(this.noteList[drawIndex])){
+                    this.activatedNotes.delete(this.noteList[drawIndex]);
+                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                }
+            }.bind(this));
+            copiedKey.addEventListener("mouseup", function(){
+                if(this.activatedNotes.has(this.noteList[drawIndex])){
+                    this.activatedNotes.delete(this.noteList[drawIndex]);
+                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                }
             }.bind(this));
             if (this.isNoteBW(this.noteIndexToScalePosition(drawIndex)) == "W") {
                 whiteKeys.push(copiedKey);
