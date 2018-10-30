@@ -111,7 +111,7 @@ class PianoKeyboard extends HTMLElement {
                 });
             }
             let copiedKey = newKey.cloneNode(true);
-            var thisNote = this.noteIndexToMidiNote(drawIndex);
+            let thisNote = this.noteIndexToMidiNote(drawIndex); // should be 'let'
             
             /*copiedKey.addEventListener("click", function () {
                 this.sendMidiNote(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
@@ -119,25 +119,25 @@ class PianoKeyboard extends HTMLElement {
             copiedKey.addEventListener("mousedown", function(){
                 if(!this.activatedNotes.has(this.noteList[drawIndex])){
                     this.activatedNotes.set(this.noteList[drawIndex], new playedNote(this.noteList[drawIndex], 128));
-                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
                 }
             }.bind(this));
             copiedKey.addEventListener("mouseover", function(evt){
                 if(!this.activatedNotes.has(this.noteList[drawIndex]) && evt.buttons===1){
                     this.activatedNotes.set(this.noteList[drawIndex], new playedNote(this.noteList[drawIndex], 128));
-                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                    this.sendMidiNoteOn(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
                 }
             }.bind(this));
             copiedKey.addEventListener("mouseout", function(){
                 if(this.activatedNotes.has(this.noteList[drawIndex])){
                     this.activatedNotes.delete(this.noteList[drawIndex]);
-                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
                 }
             }.bind(this));
             copiedKey.addEventListener("mouseup", function(){
                 if(this.activatedNotes.has(this.noteList[drawIndex])){
                     this.activatedNotes.delete(this.noteList[drawIndex]);
-                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, this.noteIndexToMidiNote(drawIndex));
+                    this.sendMidiNoteOff(this.midiAccess, this.selectedMidiOutputPortId, thisNote);
                 }
             }.bind(this));
             if (this.isNoteBW(this.noteIndexToScalePosition(drawIndex)) == "W") {
