@@ -31,6 +31,7 @@ class PianoKeyboard extends HTMLElement {
             this.highlightedNoteIndices = this.getAttribute("highlightedNotes").split(",").map(x => this.noteList.indexOf(x));
         }
         console.log("highlighted notes:", this.highlightedNoteIndices);
+        this.highlightColor = this.getAttribute("highlightColor");
         this.drawKeyboard();
 
         var style = document.createElement("style");
@@ -107,7 +108,7 @@ class PianoKeyboard extends HTMLElement {
             if (this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex) >= 0) {
                 setAttributes(newKey, {
                     "highlighted": "true",
-                    "style": "fill:red;stroke:black"
+                    "style": "fill:" + (this.highlightColor ? this.highlightColor : "red") + ";stroke:black"
                 });
             }
             let copiedKey = newKey.cloneNode(true);
