@@ -1,7 +1,4 @@
 class PianoKeyboard extends HTMLElement {
-    static get observedAttributes() {
-        return ['startNote', 'endNote', 'highlightNotes'];
-    }
     constructor() {
         super();
         var shadowRoot = this.attachShadow({
@@ -25,10 +22,10 @@ class PianoKeyboard extends HTMLElement {
         } else
             alert("No MIDI support present in your browser.  You're gonna have a bad time.");
         // get initial drawing parameters
-        this.startNote = this.getAttribute("startNote");
-        this.endNote = this.getAttribute("endNote");
-        if (this.getAttribute("highlightedNotes")) {
-            this.highlightedNoteIndices = this.getAttribute("highlightedNotes").split(",").map(x => this.noteList.indexOf(x));
+        this.startnote = this.getAttribute("startnote");
+        this.endnote = this.getAttribute("endnote");
+        if (this.getAttribute("highlightednotes")) {
+            this.highlightedNoteIndices = this.getAttribute("highlightednotes").split(",").map(x => this.noteList.indexOf(x));
         }
         console.log("highlighted notes:", this.highlightedNoteIndices);
         this.highlightColor = this.getAttribute("highlightColor");
@@ -37,6 +34,34 @@ class PianoKeyboard extends HTMLElement {
         var style = document.createElement("style");
         style.innerHTML = ":host {display: block; position: relative; contain: content;}";
         this.shadowRoot.appendChild(style);
+    }
+    static get observedAttributes() {
+        return ['startnote', 'endnote', 'highlightednotes'];
+    }
+    attributeChangedCallback(name, oldValue, newValue){
+
+        if(name === "highlightednotes" && oldValue && newValue){
+            let oldNotes = oldValue.split(",");
+            let newNotes = newValue.split(",");
+            this.handleHighlightChanges(oldNotes, newNotes);
+        } 
+    }
+    handleHighlightChanges(oldNotes, newNotes){
+        let addedHighlights, removedHighlights;
+        for(let thisNote in oldNotes){
+            if(newNotes.indexOf(oldNotes[thisNote])===-1){ // note was removed from highlights list
+                let grabTheNote = this.shadowRoot.querySelector('[data-noteName="'+CSS.escape(oldNotes[thisNote])+'"]');
+                let theNoteColor = grabTheNote.getAttribute("data-noteColor");
+                grabTheNote.style.fill = theNoteColor; //setAttribute("style", "fill:"+theNoteColor+";stroke:black");
+            }
+        }
+        for(let thisNote in newNotes){
+            if(oldNotes.indexOf(newNotes[thisNote])===-1){
+                let grabTheNote = this.shadowRoot.querySelector('[data-noteName="'+CSS.escape(newNotes[thisNote])+'"]');
+                let theNoteColor = grabTheNote.getAttribute("data-noteColor");
+                grabTheNote.style.fill = "red"; //setAttribute("style", "fill:red;stroke:black");
+            }
+        }
     }
     onMIDIInit(midi) {
         this.midiAccess = midi;
@@ -83,19 +108,19 @@ class PianoKeyboard extends HTMLElement {
         }
         let setAttributes = function (el, attrs) {
             for (var key in attrs) {
-                el.setAttribute(key, attrs[key]);
+                el.setAttributeNS(null,key, attrs[key]);
             }
         };
 
         var xDrawPos = 0;
 
         // create note drawing using range
-        var stopIndex = this.noteList.indexOf(this.endNote);
+        var stopIndex = this.noteList.indexOf(this.endnote);
         let blackKeys = [];
         let whiteKeys = [];
-        for (let drawIndex = this.noteList.indexOf(this.startNote); drawIndex <= stopIndex; drawIndex++) {
+        for (let drawIndex = this.noteList.indexOf(this.startnote); drawIndex <= stopIndex; drawIndex++) {
 
-            if (drawIndex > this.noteList.indexOf(this.startNote)) {
+            if (drawIndex > this.noteList.indexOf(this.startnote)) {
                 xDrawPos += this.xIncThisNote(this.noteIndexToScalePosition(drawIndex));
             }
 
@@ -104,11 +129,17 @@ class PianoKeyboard extends HTMLElement {
             setAttributes(newKey, {
                 "x": xDrawPos,
                 "y": 0,
+                "data-noteName": this.noteList[drawIndex]
             });
             if (this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex) >= 0) {
                 setAttributes(newKey, {
                     "highlighted": "true",
+<<<<<<< HEAD
                     "style": "fill:" + (this.highlightColor ? this.highlightColor : "red") + ";stroke:black"
+=======
+                    "style": "fill:red;stroke:black"
+                    
+>>>>>>> 6bd5b804a7286d1f77d1ffc3b6d1174121f1db27
                 });
             }
             let copiedKey = newKey.cloneNode(true);
@@ -160,7 +191,8 @@ class PianoKeyboard extends HTMLElement {
                 whiteNote.setAttribute("style", "fill:white;stroke:black");
             setAttributes(whiteNote, {
                 "width": this.wkWidth,
-                "height": this.wkHeight
+                "height": this.wkHeight,
+                "data-noteColor": "white"
             });
             svg.appendChild(whiteNote);
         }.bind(this));
@@ -169,7 +201,8 @@ class PianoKeyboard extends HTMLElement {
                 blackNote.setAttribute("style", "fill:black;stroke:black");
             setAttributes(blackNote, {
                 "width": this.bkWidth,
-                "height": this.bkHeight
+                "height": this.bkHeight,
+                "data-noteColor": "black"
             });
             svg.appendChild(blackNote);
         }.bind(this));
@@ -233,32 +266,32 @@ class PianoKeyboard extends HTMLElement {
             'A8', 'A#8', 'B8', 'C8', 'C#8', 'D8', 'D#8', 'E8', 'F8', 'F#8', 'G8', 'G#8'
         ];
     }
-    get startNote() {
-        return this._startNoteName;
+    get startnote() {
+        return this._startnoteName;
     }
-    set startNote(noteToSet) {
-        this.setAttribute("startNote", noteToSet);
-        this._startNoteName = noteToSet;
+    set startnote(noteToSet) {
+        this.setAttribute("startnote", noteToSet);
+        this._startnoteName = noteToSet;
     }
-    get endNote() {
-        return this._endNoteName;
+    get endnote() {
+        return this._endnoteName;
     }
-    set endNote(noteToSet) {
-        this.setAttribute("endNote", noteToSet);
-        this._endNoteName = noteToSet;
+    set endnote(noteToSet) {
+        this.setAttribute("endnote", noteToSet);
+        this._endnoteName = noteToSet;
     }
     get numWhiteKeyWidths() {
         let numKeys = 0;
 
-        for (let i = this.noteList.indexOf(this.startNote); i <= this.noteList.indexOf(this.endNote); i++) {
+        for (let i = this.noteList.indexOf(this.startnote); i <= this.noteList.indexOf(this.endnote); i++) {
             if (this.isNoteBW(this.noteIndexToScalePosition(i)) === "W") {
                 numKeys++;
             }
         }
-        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.startNote))) === "B") {
+        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.startnote))) === "B") {
             numKeys++; // if the first note selected is black, add one to account for the blank space that will be to the left
         }
-        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.endNote))) === "B") {
+        if (this.isNoteBW(this.noteIndexToScalePosition(this.noteList.indexOf(this.endnote))) === "B") {
             numKeys++; // if the last note selected....
         }
 
