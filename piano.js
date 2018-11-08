@@ -34,6 +34,7 @@ class PianoKeyboard extends HTMLElement {
         var style = document.createElement("style");
         style.innerHTML = ":host {display: block; position: relative; contain: content;}";
         this.shadowRoot.appendChild(style);
+
     }
     static get observedAttributes() {
         return ['startnote', 'endnote', 'highlightednotes'];
@@ -58,24 +59,46 @@ class PianoKeyboard extends HTMLElement {
         for(let thisNote in newNotes){
             if(oldNotes.indexOf(newNotes[thisNote])===-1){
                 let grabTheNote = this.shadowRoot.querySelector('[data-noteName="'+CSS.escape(newNotes[thisNote])+'"]');
-                let theNoteColor = grabTheNote.getAttribute("data-noteColor");
-                grabTheNote.style.fill = "red"; //setAttribute("style", "fill:red;stroke:black");
+                let theNoteColor = (this.highlightColor ? this.highlightColor : "red");
+                grabTheNote.style.fill = theNoteColor; //setAttribute("style", "fill:red;stroke:black");
             }
         }
     }
     onMIDIInit(midi) {
         this.midiAccess = midi;
 
+        // create selector for midi output port
+        var outputSelector = document.createElement("select");
+        outputSelector.id = "midiOutputSelector";
+        var outputOptions = document.createDocumentFragment();
+
         var haveAtLeastOneDevice = false;
         this.outputs = this.midiAccess.outputs.values();
         for (var output = this.outputs.next(); output && !output.done; output = this.outputs.next()) {
             //output.value.onmidimessage = MIDIMessageEventHandler;
             haveAtLeastOneDevice = true;
+            var thisOutputOption = document.createElement("option");
+            thisOutputOption.value = output.value.id;
+            thisOutputOption.innerHTML = output.value.name;
+            outputOptions.appendChild(thisOutputOption);
         }
-        if (!haveAtLeastOneDevice)
+        outputSelector.appendChild(outputOptions);
+        if (!haveAtLeastOneDevice){
             alert("No MIDI output devices present.  We can still show notes, but nothing will be sent");
+        } else{
+            this.selectedMidiOutputPortId = this.midiAccess.outputs.values().next().value.id;
+        }
+
+        
+        outputSelector.addEventListener("change", function(evt){
+            this.selectedMidiOutputPortId = evt.target.value;
+        }.bind(this));
+        this.shadowRoot.appendChild(outputSelector);
+        /*
         else // for now, while building midi support, just select the first output
             this.selectedMidiOutputPortId = this.midiAccess.outputs.values().next().value.id;
+        */
+
     }
 
     onMIDIReject(err) {
@@ -134,12 +157,7 @@ class PianoKeyboard extends HTMLElement {
             if (this.highlightedNoteIndices && this.highlightedNoteIndices.indexOf(drawIndex) >= 0) {
                 setAttributes(newKey, {
                     "highlighted": "true",
-<<<<<<< HEAD
                     "style": "fill:" + (this.highlightColor ? this.highlightColor : "red") + ";stroke:black"
-=======
-                    "style": "fill:red;stroke:black"
-                    
->>>>>>> 6bd5b804a7286d1f77d1ffc3b6d1174121f1db27
                 });
             }
             let copiedKey = newKey.cloneNode(true);
